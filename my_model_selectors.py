@@ -71,7 +71,12 @@ class SelectorBIC(ModelSelector):
     def select(self):
         """ select the best model for self.this_word based on
         BIC score for n between self.min_n_components and self.max_n_components
-
+        
+            BIC = −2 log L + p log N
+            L = log_likelihood
+            p = number of parameters in model
+            N = number of data points
+            
         :return: GaussianHMM object
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -91,9 +96,9 @@ class SelectorBIC(ModelSelector):
                 bic_score = -2 * log_likelihood + parameters_number * np.log(data_points_number)
                 if bic_score < best_score:
                     best_score = bic_score
-                    best_model = model
-
-            except Exception as e:
+            # pylint: disable=broad-except
+            # exceptions vary and occurs deep in other external classes
+            except Exception:
                 continue
 
         return best_model
