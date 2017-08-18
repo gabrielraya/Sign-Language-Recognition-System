@@ -117,7 +117,34 @@ class SelectorDIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        best_score = float("-inf")
+        best_model = None
+        number_of_words = len(self.hwords.keys())
+
+        for hidden_states_number in range(self.min_n_components, self.max_n_components):
+            sum_log_likelihood_other_words = 0
+            try:
+                # train the model 
+                model = GaussianHMM(n_components=hidden_states_number, n_iter=1000).fit(self.X, self.lengths)
+                sum_log_likelihood_matching_words = model.score(self.X, self.lengths)
+
+                for word in self.hwords.keys():
+                    other_word_data_points, lengths = self.hwords[word]
+                    log_likelihood_other_words = model.score(other_word_data_points, lengths)
+                    sum_log_likelihood_other_words += log_likelihood_other_words
+            # pylint: disable=broad-except
+            # exceptions vary and occurs deep in other external classes       
+            except Exception as e:
+                break
+            # DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
+            dic_score = sum_log_likelihood_matching_words - (1 / (number_of_words - 1)) * (
+                sum_log_likelihood_other_words - sum_log_likelihood_matching_words)
+
+            if dic_score > best_score:
+                best_score = dic_score
+                best_model = model
+
+        return best_model
 
 
 class SelectorCV(ModelSelector):
