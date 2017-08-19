@@ -81,8 +81,9 @@ class SelectorBIC(ModelSelector):
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection based on BIC scores
-        best_score = float("inf")
+        # Implement model selection based on BIC scores
+        # The lower the BIC value the better the model
+        lowest_bic = float("inf")
         best_model = None
 
         for hidden_states_number in range(self.min_n_components, self.max_n_components + 1):
@@ -96,8 +97,8 @@ class SelectorBIC(ModelSelector):
                 # BIC = −2 log L + p log N
                 bic_score = -2 * log_likelihood + parameters_number * np.log(len(self.X))
                 
-                if bic_score < best_score:
-                    best_score = bic_score
+                if bic_score < lowest_bic:
+                    lowest_bic = bic_score
                     best_model = model
             # pylint: disable=broad-except
             # exceptions vary and occurs deep in other external classes
