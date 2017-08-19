@@ -87,15 +87,18 @@ class SelectorBIC(ModelSelector):
 
         for hidden_states_number in range(self.min_n_components, self.max_n_components + 1):
             try:
-                model = GaussianHMM(n_components=hidden_states_number, n_iter=1000).fit(self.X, self.lengths)
+                model = self.base_model(hidden_states_number)
+                # defines the L = log_likelihood parameter
                 log_likelihood = model.score(self.X, self.lengths)
-                data_points_number = self.X.shape[0]
-                features_number = self.X.shape[1]
-                parameters_number = hidden_states_number * features_number * 2 + \
-                                    hidden_states_number * hidden_states_number - 1
-                bic_score = -2 * log_likelihood + parameters_number * np.log(data_points_number)
+                # defines the p = number of parameters in model to be  p = n^2 + 2*d*n - 1
+                parameters_number = (hidden_states_number * hidden_states_number + 
+                                     2 * model.n_features * hidden_states_number - 1)
+                # BIC = −2 log L + p log N
+                bic_score = -2 * log_likelihood + parameters_number * np.log(len(self.X))
+                
                 if bic_score < best_score:
                     best_score = bic_score
+                    best_model = model
             # pylint: disable=broad-except
             # exceptions vary and occurs deep in other external classes
             except Exception:
