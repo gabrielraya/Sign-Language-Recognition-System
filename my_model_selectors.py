@@ -155,36 +155,49 @@ class SelectorCV(ModelSelector):
 
     '''
 
+    ''' Helper function
+        returns the log_likelihood value given a base_model
+    '''
+    def run_model(self, n_components, X_train, lengths_train, X_test, lengths_test):
+        model = GaussianHMM(n_components=n_components, covariance_type="diag",n_iter=1000, 
+                            random_state=self.random_state,verbose=False).fit(X_train, lengths_train)
+        log_likelihood = model.score(X_test, lengths_test)
+        return log_likelihood
+
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        # hide hmmlearn==0.2.0 warnings
 
-        # TODO implement model selection using CV
-        k_fold = KFold()
-        best_score = float("-inf")
         best_model = None
+        highest_average = float('-inf')
+        n_splits = min(len(self.sequences), 3)
 
-        for hidden_states_number in range(self.min_n_components, self.max_n_components + 1):
-            scores = []
-            model = None
+        for n_components in range(self.min_n_components,self.max_n_components + 1):
+            total_logL = 0
+            iterations = 0
+            try:
+                if n_splits > 1:
+                    split_method = KFold(n_splits=n_splits)
+                    seq_splits = split_method.split(self.sequences)
+                    for cv_train_idx, cv_test_idx in seq_splits:
+                        X_train, lengths_train = combine_sequences(cv_train_idx, self.sequences)
+                        X_test, lengths_test = combine_sequences(cv_test_idx, self.sequences)
+                        # get log_likelihood after running model
+                        log_likelihood = self.run_model(n_components, X_train,lengths_train, X_test,lengths_test)
+                        total_logL += log_likelihood
+                        iterations += 1
+                else:
+                    log_likelihood = self.run_model(n_components, self.X, self.lengths,self.X, self.lengths)
+                    total_logL += log_likelihood
+                    iterations += 1
+                average_logL = total_logL / iterations
+                if average_logL > highest_average:
+                    highest_average = average_logL
+                    best_model = self.base_model(n_components)
 
-            if len(self.sequences) < 3:
-                break
+            # pylint: disable=broad-except
+            # exceptions vary and occurs deep in other external classes
+            except Exception:
+                continue
 
-            for training_set_indices, test_set_indices in k_fold.split(self.sequences):
-                training_set, training_set_lengths = combine_sequences(training_set_indices, self.sequences)
-                test_set, test_set_lengths = combine_sequences(test_set_indices, self.sequences)
-
-                try:
-                    model = GaussianHMM(n_components=hidden_states_number, n_iter=1000).fit(training_set,
-                                                                                            training_set_lengths)
-                    log_likelihood = model.score(test_set, test_set_lengths)
-                    scores.append(log_likelihood)
-                except Exception as e:
-                    break
-
-            average_score = np.average(scores)
-            if average_score > best_score:
-                best_score = average_score
-                best_model = model
-
-        return best_model if best_model is not None else self.base_model(self.n_constant)
+        return best_model
